@@ -61,5 +61,9 @@ SELECT
   frequency/total_frequency * 100 as coverage
 FROM mapping_stats
 CROSS JOIN totals
+<<<<<<< HEAD
 ORDER BY source_vocabulary_id, occurrences DESC
+=======
+ORDER BY source_vocabulary_id, frequency DESC NULLS LAST
+>>>>>>> e00df66... sorting nulls last for mapping frequency
 
