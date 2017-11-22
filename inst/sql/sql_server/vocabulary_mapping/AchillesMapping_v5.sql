@@ -56,14 +56,10 @@ SELECT
   source_vocabulary_id, 
   target_concept_class_id, 
   occurrences, 
-  occurrences/total_occurrences * 100 as occurence_percentage,
+  ROUND(occurrences/total_occurrences * 100, 2) as occurence_percentage,
   frequency, 
-  frequency/total_frequency * 100 as coverage
+  ROUND(frequency/total_frequency * 100, 2) as coverage
 FROM mapping_stats
 CROSS JOIN totals
-<<<<<<< HEAD
-ORDER BY source_vocabulary_id, occurrences DESC
-=======
 ORDER BY source_vocabulary_id, frequency DESC NULLS LAST
->>>>>>> e00df66... sorting nulls last for mapping frequency
 
