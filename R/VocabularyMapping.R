@@ -2,15 +2,33 @@
 #'
 #' @description
 #' \code{createFullMappingOverview} creates and fills a table with concept mappings for all source/target pairs. These pairs can be found in \code{mappingFields.csv}.
+#' The \code{_source_vocabularies} are used to retrieve the \code{source_code_description} of \code{_source_value}'s. This gives more informative overviews of the top (not) mapped concepts.
 #'
 #' @details
 #' \code{createFullMappingOverview} creates and fills a table with concept mappings for all source/target pairs. These pairs can be found in \code{mappingFields.csv}.
 #' 
 #' @param connectionDetails An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
 #' @param resultsDatabaseSchema		string name of database schema that we can write results to. Default is 'webapi'
+#' @param condition_source_vocabularies		string or vector ids of the source vocabularies used to map condition_source_values to condition_concept_ids via the source_to_concept_map table.
 #' 
 #' @export
-createFullMappingOverview <- function(connectionDetails, resultsDatabaseSchema = "webapi") {
+createFullMappingOverview <- function(
+    connectionDetails, 
+    resultsDatabaseSchema = "webapi",
+    condition_source_vocabularies = "",
+    drug_source_vocabularies = "",
+    device_source_vocabularies = drug_source_vocabularies,
+    procedure_source_vocabularies = "",
+    specimen_source_vocabularies = "",
+    measurement_source_vocabularies = "",
+    measurement_unit_source_vocabularies = "",
+    measurement_value_source_vocabularies = "",
+    observation_source_vocabularies = "",
+    observation_unit_source_vocabularies = measurement_unit_source_vocabularies,
+    observation_qualifier_source_vocabularies = "",
+    death_source_vocabularies = "",
+    specialty_source_vocabularies = ""
+  ) {
   connection <- connect(connectionDetails)
   
   # Set up new table
@@ -22,6 +40,24 @@ createFullMappingOverview <- function(connectionDetails, resultsDatabaseSchema =
   sql <- ""
   for (i in 1:nrow(mappingTargets)) {
     mappingTarget <- mappingTargets[i,]
+    
+    vocab_ids <- switch(
+         EXPR = as.character(mappingTarget$mapping_id)
+        ,condition             = condition_source_vocabularies
+        ,drug                  = drug_source_vocabularies
+        ,procedure             = procedure_source_vocabularies
+        ,device                = device_source_vocabularies
+        ,specimen              = specimen_source_vocabularies
+        ,measurement           = measurement_source_vocabularies
+        ,measurement_unit      = measurement_unit_source_vocabularies
+        ,measurement_value     = measurement_value_source_vocabularies
+        ,observation           = observation_source_vocabularies
+        ,observation_unit      = observation_unit_source_vocabularies
+        ,observation_qualifier = observation_qualifier_source_vocabularies
+        ,death                 = death_source_vocabularies
+        ,provider_specialty    = specialty_source_vocabularies
+    )
+
     insertQuery <- createMappingOverviewInsertQuery(
       connectionDetails, 
       resultsDatabaseSchema,
@@ -29,7 +65,7 @@ createFullMappingOverview <- function(connectionDetails, resultsDatabaseSchema =
       mappingTarget$concept_id_field, 
       mappingTarget$source_concept_id, 
       mappingTarget$source_value_field, 
-      "", 
+      vocab_ids, 
       mappingTarget$mapping_id
     )
     sql <- paste(sql,";", insertQuery)
@@ -101,8 +137,6 @@ createMappingOverviewInsertQuery <- function(connectionDetails, resultsDatabaseS
 
 #' @title mappingStats
 #' 
-#' NOTE: createFullMappingOverview has been run first
-#'
 #' @description
 #' \code{mappingStats} returns mapping statistics for all or for a specific mapping
 #'
@@ -117,6 +151,8 @@ createMappingOverviewInsertQuery <- function(connectionDetails, resultsDatabaseS
 #'
 #' @export
 mappingStats <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappingName = "") {
+  # TODO: check whether  createFullMappingOverview has been called. If not, rerun. Same for top[Not]Mapped method
+
   # Select everything if no mappingName is given
   if (mappingName == "" || is.null(mappingName)) {
     mappingName = "%" 
