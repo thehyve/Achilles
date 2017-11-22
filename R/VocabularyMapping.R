@@ -7,14 +7,15 @@
 #' \code{createFullMappingOverview} creates and fills a table with concept mappings for all source/target pairs. These pairs can be found in \code{mappingFields.csv}.
 #' 
 #' @param connectionDetails An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
+#' @param resultsDatabaseSchema		string name of database schema that we can write results to. Default is 'webapi'
 #' 
 #' @export
 createFullMappingOverview <- function(connectionDetails, resultsDatabaseSchema = "webapi") {
   connection <- connect(connectionDetails)
   
   # Set up new table
-  dropMappingOverviewTable(connection, resultsDatabaseSchema)
-  createMappingOverviewTable(connection, resultsDatabaseSchema)
+  dropMappingOverviewTable(connection, resultsDatabaseSchema, connectionDetails$dbms)
+  createMappingOverviewTable(connection, resultsDatabaseSchema, connectionDetails$dbms)
   
   # For every source/target field, create query and concatenate
   mappingTargets <- getMappingFields()
@@ -54,8 +55,8 @@ createMappingOverviewTable <- function(connection, schema, dbms) {
         	source_code varchar(50) NULL,
         	source_vocabulary_id varchar(20) NULL,
         	source_code_description varchar(255) NULL,
-        	concept_id int4 NULL,
-        	concept_name varchar(255) NULL,
+        	target_concept_id int4 NULL,
+        	target_concept_name varchar(255) NULL,
         	target_concept_class_id varchar NULL,
           is_mapped boolean NOT NULL,
         	frequency int8 NULL
@@ -82,7 +83,7 @@ createMappingOverviewInsertQuery <- function(connectionDetails, resultsDatabaseS
   }
   
   # TODO: replace by regular loadRenderTranslateSql
-  sql <- loadRenderTranslateSql2("vocabulary_mapping/MappingOverview.sql",
+  sql <- loadRenderTranslateSql2("vocabulary_mapping/AllMappings.sql",
                                  packageName = "Achilles",
                                  dbms = connectionDetails$dbms,
                                  results_database_schema = resultsDatabaseSchema,
@@ -98,37 +99,41 @@ createMappingOverviewInsertQuery <- function(connectionDetails, resultsDatabaseS
   return(sql)
 }
 
-#' @title vocabularyMapping
+#' @title mappingStats
+#' 
+#' NOTE: createFullMappingOverview has been run first
 #'
 #' @description
-#' \code{vocabularyMapping} creates mapping statistics for a specific source vocabulary
+#' \code{mappingStats} returns mapping statistics for all or for a specific mapping
 #'
 #' @details
-#' \code{vocabularyMapping} creates mapping statistics for a specific source vocabulary
+#' \code{mappingStats} returns mapping statistics for all or for a specific mapping
 #' 
 #' @param connectionDetails An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
-#' @param cdmTable Name of cdm domain table to inspect, one of `condition_occurrence`, `procedure_occurrence`, `drug_exposure`, `measurement` or `observation`.
-#' @param sourceVocabularyId  Name of the source vocabulary to evaluate
-#' 
+#' @param resultsDatabaseSchema		string name of database schema that we can write results to. Default is 'webapi'
+#' @param mappingName Name of the mapping, e.g. 'condition', 'observation', 'observation_value', ... For a full list see \code{mappingFields.csv}. Default to all mappings (NULL)
+#'
 #' @return A dataframe with results
-#' 
+#'
 #' @export
-vocabularyMapping <- function(connectionDetails, cdmTable, sourceVocabularyId){
-  sourceValueColumn = getMainSourceValueColumnName(cdmTable)
-
-  sql <- loadRenderTranslateSql2("vocabulary_mapping/AchillesMapping_v5.sql",
+mappingStats <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappingName = "") {
+  # Select everything if no mappingName is given
+  if (mappingName == "" || is.null(mappingName)) {
+    mappingName = "%" 
+  }
+  
+  sql <- loadRenderTranslateSql2("vocabulary_mapping/MappingStats.sql",
                                  packageName = "Achilles",
                                  dbms = connectionDetails$dbms,
-                                 cdm_schema = connectionDetails$schema,
-                                 cdm_table = cdmTable,
-                                 concept_source_column = sourceValueColumn,
-                                 source_vocabulary_id = sourceVocabularyId
+                                 results_database_schema = resultsDatabaseSchema,
+                                 mapping_name = mappingName
   )
 
   connection <- connect(connectionDetails)
-  result_df <- querySql(connection, sql)
-
-  return(result_df)
+  df <- querySql(connection, sql)
+  
+  df$COVERAGE <- df$FREQUENCY / sum(df$FREQUENCY) * 100
+  return(df)
 }
 
 #' @title Top Concepts Mapped
@@ -140,101 +145,59 @@ vocabularyMapping <- function(connectionDetails, cdmTable, sourceVocabularyId){
 #' \code{topMapped} returns a dataframe of the \code{topX} mapped concepts, based on occurrence
 #' 
 #' @param connectionDetails An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
-#' @param cdmTable Name of cdm domain table to inspect, one of `condition_occurrence`, `procedure_occurrence`, `drug_exposure`, `measurement` or `observation`.
-#' @param sourceVocabularyId  Name of the source vocabulary to evaluate
+#' @param resultsDatabaseSchema		string name of database schema that we can write results to. Default is 'webapi'
+#' @param mappingName Name of the mapping, e.g. 'condition', 'observation', 'observation_value', ... For a full list see \code{mappingFields.csv}.
 #' @param topX
 #' 
 #' @return A dataframe with results
 #' 
 #' @export
-topMapped <- function(connectionDetails, cdmTable, sourceVocabularyId, topX = 10){
-  return(topSourceToTargetConcepts_(connectionDetails, cdmTable, sourceVocabularyId, topX, TRUE))
+topMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappingName, topX = 20){
+  if (is.null(topX)) {
+    topX = "NULL"
+  }
+  sql <- loadRenderTranslateSql2("vocabulary_mapping/TopMappedConcepts.sql",
+                                 packageName = "Achilles",
+                                 dbms = connectionDetails$dbms,
+                                 results_database_schema = resultsDatabaseSchema,
+                                 mapping_name = mappingName,
+                                 limit = topX
+  )
+
+  connection <- connect(connectionDetails)
+  return(querySql(connection, sql))
 }
 
 #' @title Top Concepts Not Mapped
 #'
 #' @description
-#' \code{topMapped} returns a dataframe of the \code{topX} unmapped concepts, based on occurrence
+#' \code{topNotMapped} returns a dataframe of the \code{topX} unmapped concepts, based on occurrence
 #'
 #' @details
-#' \code{topMapped} returns a dataframe of the \code{topX} unmapped concepts, based on occurrence
+#' \code{topNotMapped} returns a dataframe of the \code{topX} unmapped concepts, based on occurrence
 #' 
 #' @param connectionDetails An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
-#' @param cdmTable Name of cdm domain table to inspect, one of `condition_occurrence`, `procedure_occurrence`, `drug_exposure`, `measurement` or `observation`.
-#' @param sourceVocabularyId  Name of the source vocabulary to evaluate
+#' @param resultsDatabaseSchema		string name of database schema that we can write results to. Default is 'webapi'
+#' @param mappingName Name of the mapping, e.g. 'condition', 'observation', 'observation_value', ... For a full list see \code{mappingFields.csv}.
 #' @param topX
 #' 
 #' @return A dataframe with the results
 #' 
 #' @export
-topUnmapped <- function(connectionDetails, cdmTable, sourceVocabularyId, topX = 10){
-  return(topSourceToTargetConcepts_(connectionDetails, cdmTable, sourceVocabularyId, topX, FALSE))
-}
-
-### Supportive functions ###
-
-topSourceToTargetConcepts_ <- function(connectionDetails, cdmTable, sourceVocabularyId, topX, getMapped) {
-  sourceValueColumn = getMainSourceValueColumnName(cdmTable)
-  conceptIdColumn = getMainConceptIdColumnName(cdmTable)
-  
-  ## Get top x mapped or unmapped concepts
-  sql <- loadRenderTranslateSql2("vocabulary_mapping/TopConcepts_v5.sql",
+topNotMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappingName, topX = 20){
+  if (is.null(topX)) {
+    topX = "NULL"
+  }
+  sql <- loadRenderTranslateSql2("vocabulary_mapping/TopNotMappedConcepts.sql",
                                  packageName = "Achilles",
                                  dbms = connectionDetails$dbms,
-                                 cdm_schema = connectionDetails$schema,
-                                 cdm_table = cdmTable,
-                                 concept_source_column = sourceValueColumn,
-                                 concept_id_column = conceptIdColumn,
-                                 source_vocabulary_id = sourceVocabularyId,
-                                 get_mapped = getMapped,
+                                 results_database_schema = resultsDatabaseSchema,
+                                 mapping_name = mappingName,
                                  limit = topX
   )
+
   connection <- connect(connectionDetails)
-  result_df <- querySql(connection, sql)
-  
-  return(result_df)
-}
-
-getMainSourceValueColumnName <- function(cdmTable) {
-  if (cdmTable == 'condition_occurrence') {
-    return('condition_source_value')
-    
-  } else if (cdmTable == 'procedure_occurrence') {
-    return('procedure_source_value')
-    
-  } else if (cdmTable == 'drug_exposure') {
-    return('drug_source_value')
-    
-  } else if (cdmTable == 'measurement') {
-    return('measurement_source_value')
-    
-  } else if (cdmTable == 'observation') {
-    return('observation_source_value')
-    
-  } else {
-    stop(sprintf("Did not recognise table name '%s'", cdmTable))
-  }
-}
-
-getMainConceptIdColumnName <- function(cdmTable) {
-  if (cdmTable == 'condition_occurrence') {
-    return('condition_concept_id')
-    
-  } else if (cdmTable == 'procedure_occurrence') {
-    return('procedure_concept_id')
-    
-  } else if (cdmTable == 'drug_exposure') {
-    return('drug_concept_id')
-    
-  } else if (cdmTable == 'measurement') {
-    return('measurement_concept_id')
-    
-  } else if (cdmTable == 'observation') {
-    return('observation_concept_id')
-    
-  } else {
-    stop(sprintf("Did not recognise table name '%s'", cdmTable))
-  }
+  return(querySql(connection, sql))
 }
 
 loadRenderTranslateSql2 <- function (sqlFilename, packageName, dbms = "sql server", ..., 

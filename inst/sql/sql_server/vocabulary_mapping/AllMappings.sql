@@ -15,12 +15,11 @@ all_mappings AS (
 		COALESCE(source_concept.concept_code, stcm.source_code, source_value) AS source_code,
 		COALESCE(source_concept.vocabulary_id, stcm.source_vocabulary_id) AS source_vocabulary_id,
 		COALESCE(source_concept.concept_name, stcm.source_code_description) AS source_code_description,
-		target_concept.concept_id,
-		target_concept.concept_name,
+		target_concept.concept_id AS target_concept_id,
+		target_concept.concept_name AS target_concept_name,
 		target_concept.concept_class_id AS target_concept_class_id,
 		CASE
-			WHEN target_concept.concept_id > 0 
-			THEN TRUE
+			WHEN target_concept.concept_id > 0 	THEN TRUE
 			ELSE FALSE
 		END AS is_mapped
 	FROM concepts
@@ -38,8 +37,8 @@ INSERT INTO @results_database_schema.achilles_vocab_concept_mappings (
 	source_code,
 	source_vocabulary_id,
 	source_code_description,
-	concept_id,
-	concept_name,
+	target_concept_id,
+	target_concept_name,
 	target_concept_class_id,
 	is_mapped,
 	frequency
@@ -49,10 +48,10 @@ SELECT
   source_code, 
   source_vocabulary_id, 
   source_code_description, 
-  concept_id, 
-  concept_name, 
+  target_concept_id, 
+  target_concept_name, 
   target_concept_class_id, 
   is_mapped,
   count(*) AS frequency
 FROM all_mappings 
-GROUP BY source_code, source_vocabulary_id, source_code_description, concept_id, concept_name, target_concept_class_id, is_mapped
+GROUP BY source_code, source_vocabulary_id, source_code_description, target_concept_id, target_concept_name, target_concept_class_id, is_mapped
