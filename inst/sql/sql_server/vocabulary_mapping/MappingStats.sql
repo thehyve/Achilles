@@ -4,7 +4,8 @@ SELECT
 	target_concept_class_id,
 	is_mapped,
 	count(DISTINCT source_code) 	  AS n_source_codes, 
-    count(DISTINCT target_concept_id) AS n_target_concepts,
+  count(DISTINCT target_concept_id) AS n_target_concepts,
+	sum(person_count)         AS person_count,
 	sum(frequency) 					  AS frequency
 FROM @results_database_schema.achilles_vocab_concept_mappings
 WHERE mapping_name LIKE '@mapping_name'

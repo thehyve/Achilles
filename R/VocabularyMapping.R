@@ -95,7 +95,8 @@ createMappingOverviewTable <- function(connection, schema, dbms) {
         	target_concept_name varchar(255) NULL,
         	target_concept_class_id varchar NULL,
           is_mapped boolean NOT NULL,
-        	frequency int8 NULL
+        	frequency int8 NULL,
+          person_count int8 NULL
       );",schema),
       targetDialect=dbms
   )
@@ -111,15 +112,20 @@ createMappingOverviewInsertQuery <- function(connectionDetails, resultsDatabaseS
   sourceVocabularyIds <- paste("'", sourceVocabularyIds, "'", collapse = ",", sep="")
   
   if (sourceIdColumn == "") {
-    sourceIdColumn = "CAST(NULL AS INTEGER)"
+    sourceIdColumn <- "CAST(NULL AS INTEGER)"
   }
   
   if (sourceValueColumn == "") {
-    sourceValueColumn = "CAST(NULL AS VARCHAR)"
+    sourceValueColumn <- "CAST(NULL AS VARCHAR)"
+  }
+  
+  personColumn <- "person_id"
+  if (cdmTable == "care_site" || cdmTable == "provider") {
+    personColumn <- "CAST(NULL AS INTEGER)"
   }
   
   # TODO: replace by regular loadRenderTranslateSql
-  sql <- loadRenderTranslateSql2("vocabulary_mapping/AllMappings.sql",
+  sql <- loadRenderTranslateSql2("vocabulary_mapping/SingleMappingsOverview.sql",
                                  packageName = "Achilles",
                                  dbms = connectionDetails$dbms,
                                  results_database_schema = resultsDatabaseSchema,
@@ -129,7 +135,8 @@ createMappingOverviewInsertQuery <- function(connectionDetails, resultsDatabaseS
                                  source_concept_id_column = sourceIdColumn,
                                  source_value_column = sourceValueColumn,
                                  source_vocabulary_id_list = sourceVocabularyIds,
-                                 mapping_name = mappingName
+                                 mapping_name = mappingName,
+                                 person_id_column = personColumn
   )
   
   return(sql)

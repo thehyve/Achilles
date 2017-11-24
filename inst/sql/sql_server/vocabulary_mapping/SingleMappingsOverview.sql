@@ -1,12 +1,14 @@
 WITH concepts(
 	target_concept_id,
 	source_concept_id,
-	source_value
+	source_value,
+	person_id
 ) AS (
 	SELECT 
 		@concept_id_column,
 		@source_concept_id_column,
-		@source_value_column
+		@source_value_column,
+		@person_id_column
 	FROM @cdm_database_schema.@cdm_table
 ),
 all_mappings AS (
@@ -21,7 +23,8 @@ all_mappings AS (
 		CASE
 			WHEN target_concept.concept_id > 0 	THEN TRUE
 			ELSE FALSE
-		END AS is_mapped
+		END AS is_mapped,
+		person_id
 	FROM concepts
 	LEFT JOIN @cdm_database_schema.concept AS target_concept 
 	  ON target_concept_id = target_concept.concept_id
@@ -29,8 +32,8 @@ all_mappings AS (
 	  ON source_concept_id = source_concept.concept_id
 	LEFT JOIN @cdm_database_schema.source_to_concept_map AS stcm 
 		ON source_value = stcm.source_code
-		AND stcm.source_vocabulary_id IN (@source_vocabulary_id_list) -- Tricky: wrong counts if the codes for the given vocabularies overlap
-	WHERE concepts.target_concept_id IS NOT NULL -- filters empty _concept_id (if not required)
+		AND stcm.source_vocabulary_id IN (@source_vocabulary_id_list)
+	WHERE concepts.target_concept_id IS NOT NULL -- filters empty _concept_id (if concept not required)
 )
 INSERT INTO @results_database_schema.achilles_vocab_concept_mappings (
   mapping_name,
@@ -41,7 +44,8 @@ INSERT INTO @results_database_schema.achilles_vocab_concept_mappings (
 	target_concept_name,
 	target_concept_class_id,
 	is_mapped,
-	frequency
+	frequency,
+	person_count
 )
 SELECT
   '@mapping_name',
@@ -52,6 +56,7 @@ SELECT
   target_concept_name, 
   target_concept_class_id, 
   is_mapped,
-  count(*) AS frequency
+  count(DISTINCT person_id),
+  count(*)
 FROM all_mappings 
 GROUP BY source_code, source_vocabulary_id, source_code_description, target_concept_id, target_concept_name, target_concept_class_id, is_mapped
