@@ -269,6 +269,8 @@ topNotMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
   # Coverage as percentage of all records in this mapping type
   total <- getTotalFrequency(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)
   df$COVERAGE <- df$FREQUENCY / total * 100
+  # To Gain percentage if topX mapped
+  df$TO_GAIN <- cumsum(df$COVERAGE)
     
   return(df)
 }
