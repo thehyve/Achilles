@@ -183,6 +183,24 @@ mappingStats <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
   return(df)
 }
 
+mappingStatsHighLevel <- function(connectionDetails, resultsDatabaseSchema = "webapi") {
+  connection <- connect(connectionDetails)
+  
+  # If no mapping overview created yet, do that here
+  if (!hasMappingOverview(connection, resultsDatabaseSchema, connectionDetails$dbms)) {
+    createMappingOverview(connectionDetails, resultsDatabaseSchema)
+  }
+
+  sql <- loadRenderTranslateSql2("vocabulary_mapping/MappingStatsHighLevel.sql",
+                                 packageName = "Achilles",
+                                 dbms = connectionDetails$dbms,
+                                 results_database_schema = resultsDatabaseSchema
+  )
+
+  df <- querySql(connection, sql)
+  return(df)
+}
+
 #' @title Top Concepts Mapped
 #'
 #' @description
