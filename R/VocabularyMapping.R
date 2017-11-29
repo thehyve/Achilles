@@ -32,8 +32,8 @@ createMappingOverview <- function(
   connection <- connect(connectionDetails)
   
   # Set up new table
-  dropMappingOverviewTable(connection, resultsDatabaseSchema, connectionDetails$dbms)
-  createMappingOverviewTable(connection, resultsDatabaseSchema, connectionDetails$dbms)
+  dropAndCreateMappingOverviewTable(connection, resultsDatabaseSchema, connectionDetails$dbms)
+  # createMappingOverviewTable(connection, resultsDatabaseSchema, connectionDetails$dbms)
   
   # For every source/target field, create query and concatenate
   mappingTargets <- getMappingFields()
@@ -76,31 +76,14 @@ createMappingOverview <- function(
   executeSql(connection, sql)
 }
 
-dropMappingOverviewTable <- function(connection, schema, dbms) {
-  dropQuery <- SqlRender::translateSql(
-    sprintf("DROP TABLE IF EXISTS %s.achilles_vocab_concept_mappings;", schema),
-    targetDialect=dbms
+dropAndCreateMappingOverviewTable <- function(connection, schema, dbms) {
+  sql <- loadRenderTranslateSql2(
+    "vocabulary_mapping/DDL_SingleMappingsOverview.sql",
+    packageName = "Achilles",
+    dbms = connectionDetails$dbms,
+    results_database_schema = schema
   )
-  executeSql(connection, dropQuery$sql)
-}
-
-createMappingOverviewTable <- function(connection, schema, dbms) {
-  createQuery <- SqlRender::translateSql(
-      sprintf("CREATE TABLE %s.achilles_vocab_concept_mappings (
-        	mapping_name varchar(50) NULL,
-        	source_code varchar(50) NULL,
-        	source_vocabulary_id varchar(20) NULL,
-        	source_code_description varchar(255) NULL,
-        	target_concept_id int4 NULL,
-        	target_concept_name varchar(255) NULL,
-        	target_concept_class_id varchar NULL,
-          is_mapped boolean NOT NULL,
-        	frequency int8 NULL,
-          person_count int8 NULL
-      );",schema),
-      targetDialect=dbms
-  )
-  executeSql(connection, createQuery$sql)
+  executeSql(connection, sql)
 }
 
 getMappingFields <- function() {
