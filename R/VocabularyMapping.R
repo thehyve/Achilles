@@ -12,7 +12,7 @@
 #' @param condition_source_vocabularies		string or vector ids of the source vocabularies used to map condition_source_values to condition_concept_ids via the source_to_concept_map table.
 #' 
 #' @export
-createMappingOverview <- function(
+listAllMappings <- function(
     connectionDetails, 
     resultsDatabaseSchema = "webapi",
     condition_source_vocabularies = "",
@@ -33,8 +33,7 @@ createMappingOverview <- function(
   
   # Set up new table
   dropAndCreateMappingOverviewTable(connection, resultsDatabaseSchema, connectionDetails$dbms)
-  # createMappingOverviewTable(connection, resultsDatabaseSchema, connectionDetails$dbms)
-  
+
   # For every source/target field, create query and concatenate
   mappingTargets <- getMappingFields()
   sql <- ""
@@ -59,11 +58,11 @@ createMappingOverview <- function(
     )
 
     insertQuery <- createMappingOverviewInsertQuery(
-      connectionDetails, 
+      connectionDetails,
       resultsDatabaseSchema,
-      mappingTarget$table_name, 
-      mappingTarget$concept_id_field, 
-      mappingTarget$source_concept_id, 
+      mappingTarget$table_name,
+      mappingTarget$concept_id_field,
+      mappingTarget$source_concept_id,
       mappingTarget$source_value_field, 
       vocab_ids, 
       mappingTarget$mapping_id
@@ -71,8 +70,7 @@ createMappingOverview <- function(
     sql <- paste(sql,";", insertQuery)
   }
   
-  # Execute all the statements in one go
-  connection <- connect(connectionDetails)
+  # Execute all the statements
   executeSql(connection, sql)
 }
 
@@ -108,7 +106,7 @@ createMappingOverviewInsertQuery <- function(connectionDetails, resultsDatabaseS
   }
   
   # TODO: replace by regular loadRenderTranslateSql
-  sql <- loadRenderTranslateSql2("vocabulary_mapping/SingleMappingsOverview.sql",
+  sql <- loadRenderTranslateSql2("vocabulary_mapping/ListMappings.sql",
                                  packageName = "Achilles",
                                  dbms = connectionDetails$dbms,
                                  results_database_schema = resultsDatabaseSchema,
@@ -162,11 +160,11 @@ mappingStats <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
 
   df <- querySql(connection, sql)
   
-  df$COVERAGE <- df$FREQUENCY / sum(df$FREQUENCY) * 100
+  df$PERCENTAGE_OF_ROWS <- df$N_ROWS / sum(df$N_ROWS) * 100
   return(df)
 }
 
-mappingStatsHighLevel <- function(connectionDetails, resultsDatabaseSchema = "webapi") {
+mappingStatsOverview <- function(connectionDetails, resultsDatabaseSchema = "webapi") {
   connection <- connect(connectionDetails)
   
   # If no mapping overview created yet, do that here
@@ -174,7 +172,7 @@ mappingStatsHighLevel <- function(connectionDetails, resultsDatabaseSchema = "we
     createMappingOverview(connectionDetails, resultsDatabaseSchema)
   }
 
-  sql <- loadRenderTranslateSql2("vocabulary_mapping/MappingStatsHighLevel.sql",
+  sql <- loadRenderTranslateSql2("vocabulary_mapping/MappingStatsOverview.sql",
                                  packageName = "Achilles",
                                  dbms = connectionDetails$dbms,
                                  results_database_schema = resultsDatabaseSchema
@@ -224,7 +222,7 @@ topMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappi
   
   # Coverage as percentage of all records in this mapping type
   total <- getTotalFrequency(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)
-  df$COVERAGE <- df$FREQUENCY / total * 100
+  df$PERCENTAGE_OF_ALL_ROWS <- df$N_ROWS / total * 100
   
   return(df)
 }
@@ -269,9 +267,9 @@ topNotMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
   
   # Coverage as percentage of all records in this mapping type
   total <- getTotalFrequency(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)
-  df$COVERAGE <- df$FREQUENCY / total * 100
+  df$PERCENTAGE_OF_ALL_ROWS <- df$N_ROWS / total * 100
   # To Gain percentage if topX mapped
-  df$TO_GAIN <- cumsum(df$COVERAGE)
+  df$TO_GAIN <- cumsum(df$PERCENTAGE_OF_ALL_ROWS)
     
   return(df)
 }
@@ -283,7 +281,7 @@ getTotalFrequency <- function(connection, resultsDatabaseSchema = "webapi", dbms
     }
   
     query <- SqlRender::translateSql(
-      sprintf("SELECT sum(frequency) AS TOTAL 
+      sprintf("SELECT sum(n_rows) AS TOTAL 
               FROM %s.achilles_vocab_concept_mappings 
               WHERE mapping_name LIKE '%s'",resultsDatabaseSchema, mappingName),
       targetDialect=dbms
@@ -295,6 +293,10 @@ getTotalFrequency <- function(connection, resultsDatabaseSchema = "webapi", dbms
 hasMappingOverview <- function(connection, resultsDatabaseSchema = "webapi", dbms,  mappingName = NULL) {
     if (mappingName == "" || is.null(mappingName)) {
       mappingName = "%" 
+    } else {
+      if (!mappingName %in% getMappingFields()$mapping_id) {
+        stop(sprintf("Mapping name '%s' is not recognised, please see 'inst/csv/%s' for a list of all possible mapping ids.", mappingName, "mappingFields.csv"))
+      }
     }
   
     query <- SqlRender::translateSql(

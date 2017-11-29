@@ -47,8 +47,8 @@ INSERT INTO @results_database_schema.achilles_vocab_concept_mappings (
 	target_concept_class_id,
 	target_standard_concept,
 	is_mapped,
-	person_count,
-	frequency
+	n_persons,
+	n_rows
 )
 SELECT
   '@mapping_name',
