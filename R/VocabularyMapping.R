@@ -143,7 +143,7 @@ mappingStats <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
   
   # If no mapping overview created yet, do that here
   if (!hasMappingOverview(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)) {
-    createMappingOverview(connectionDetails, resultsDatabaseSchema)
+    listAllMappings(connectionDetails, resultsDatabaseSchema)
   }
 
   # Select everything if no mappingName is given
@@ -164,12 +164,26 @@ mappingStats <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
   return(df)
 }
 
+#' @title mappingStatsOverview
+#' 
+#' @description
+#' \code{mappingStats} returns an overview of the mappings per mapping type
+#'
+#' @details
+#' \code{mappingStats} returns an overview of the mappings per mapping type
+#' 
+#' @param connectionDetails An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
+#' @param resultsDatabaseSchema		string name of database schema that we can write results to. Default is 'webapi'
+#' 
+#' @return A dataframe with results
+#'
+#' @export
 mappingStatsOverview <- function(connectionDetails, resultsDatabaseSchema = "webapi") {
   connection <- connect(connectionDetails)
   
   # If no mapping overview created yet, do that here
   if (!hasMappingOverview(connection, resultsDatabaseSchema, connectionDetails$dbms)) {
-    createMappingOverview(connectionDetails, resultsDatabaseSchema)
+    listAllMappings(connectionDetails, resultsDatabaseSchema)
   }
 
   sql <- loadRenderTranslateSql2("vocabulary_mapping/MappingStatsOverview.sql",
@@ -202,7 +216,7 @@ topMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappi
   connection <- connect(connectionDetails)
   # If no mapping overview created yet, do that here
   if (!hasMappingOverview(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)) {
-    createMappingOverview(connectionDetails, resultsDatabaseSchema)
+    listAllMappings(connectionDetails, resultsDatabaseSchema)
   }
   
   if (is.null(topX)) {
@@ -222,7 +236,7 @@ topMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappi
   
   # Coverage as percentage of all records in this mapping type
   total <- getTotalFrequency(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)
-  df$PERCENTAGE_OF_ALL_ROWS <- df$N_ROWS / total * 100
+  df$PERCENTAGE_OF_ROWS <- df$N_ROWS / total * 100
   
   return(df)
 }
@@ -247,7 +261,7 @@ topNotMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
   connection <- connect(connectionDetails)
   # If no mapping overview created yet, do that here
   if (!hasMappingOverview(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)) {
-    createMappingOverview(connectionDetails, resultsDatabaseSchema)
+    listAllMappings(connectionDetails, resultsDatabaseSchema)
   }
   
   if (is.null(topX)) {
@@ -267,9 +281,9 @@ topNotMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
   
   # Coverage as percentage of all records in this mapping type
   total <- getTotalFrequency(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)
-  df$PERCENTAGE_OF_ALL_ROWS <- df$N_ROWS / total * 100
+  df$PERCENTAGE_OF_ROWS <- df$N_ROWS / total * 100
   # To Gain percentage if topX mapped
-  df$TO_GAIN <- cumsum(df$PERCENTAGE_OF_ALL_ROWS)
+  df$TO_GAIN <- cumsum(df$PERCENTAGE_OF_ROWS)
     
   return(df)
 }
@@ -298,7 +312,9 @@ hasMappingOverview <- function(connection, resultsDatabaseSchema = "webapi", dbm
         stop(sprintf("Mapping name '%s' is not recognised, please see 'inst/csv/%s' for a list of all possible mapping ids.", mappingName, "mappingFields.csv"))
       }
     }
-  
+    
+    mappingName = "%" # hack to report on existence of table
+    
     query <- SqlRender::translateSql(
       sprintf("SELECT count(*) AS COUNT 
               FROM %s.achilles_vocab_concept_mappings 
@@ -327,4 +343,52 @@ loadRenderTranslateSql2 <- function (sqlFilename, packageName, dbms = "sql serve
     renderedSql <- translateSql(sql = renderedSql, targetDialect = dbms, 
                                 oracleTempSchema = oracleTempSchema)$sql
   renderedSql
+}
+
+#' @title Full export of all vocabulary stats
+#' 
+#' @description
+#' \code{exportVocabStats} is a convenience function that creates a csv file for every mapping stat.
+#'
+#' @details
+#' \code{exportVocabStats} is a convenience function that creates a csv file for every mapping stat.
+#' The result is one mapping overview csv and a folder for each CDM source to concept mapping type.
+#' Each folder contains a detailed mapping statistic and the \code{topX} mapped and not mapped concepts.
+#' 
+#' @param connectionDetails An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
+#' @param resultsDatabaseSchema		string name of database schema that we can write results to. Default is 'webapi'
+#' @param outputPath string in this folder the mapping stats are written.
+#' @param mappingName Name of the mapping, e.g. 'condition', 'observation', 'observation_value', ... For a full list see \code{mappingFields.csv}.
+#' @param topX
+#' 
+#' @export
+exportVocabStats <- function(connectionDetails, resultsDatabaseSchema = "webapi",  outputPath="./out", topX = 20) {
+  mappingNames <- getMappingFields()$mapping_id
+  
+  df.overview <- mappingStatsOverview(connectionDetails, resultsDatabaseSchema)
+  dir.create(outputPath, showWarnings = FALSE)
+  write.csv(df.overview, file.path(outputPath, "mapping_overview.csv"))
+  
+  for(mappingName in mappingNames) {
+    subPath <- file.path(outputPath, mappingName)
+
+    df.detail <- mappingStats(connectionDetails, resultsDatabaseSchema, mappingName)
+    if (nrow(df.detail) > 0) {
+      dir.create(subPath, showWarnings = FALSE)
+      write.csv(df.detail, file.path(subPath, "mapping_stats.csv"))
+    } else {
+      # If no mapping stats for this mapping, then there are no concepts at all
+      next
+    }
+    
+    df.mapped <- topMapped(connectionDetails, resultsDatabaseSchema, mappingName, topX)
+    if (nrow(df.mapped) > 0) {
+      write.csv(df.mapped, file.path(subPath, "top20mapped.csv"))
+    }
+    
+    df.notmapped <- topNotMapped(connectionDetails, resultsDatabaseSchema, mappingName, 20)
+    if (nrow(df.notmapped) > 0) {
+      write.csv(df.notmapped, file.path(subPath, "top20unmapped.csv"))
+    }
+  }
 }
