@@ -75,8 +75,8 @@ listAllMappings <- function(
 }
 
 dropAndCreateMappingOverviewTable <- function(connection, schema, dbms) {
-  sql <- loadRenderTranslateSql2(
-    "vocabulary_mapping/DDL_SingleMappingsOverview.sql",
+  sql <- SqlRender::loadRenderTranslateSql(     
+    sqlFilename = "vocabulary_mapping/DDL_SingleMappingsOverview.sql",
     packageName = "Achilles",
     dbms = connectionDetails$dbms,
     results_database_schema = schema
@@ -106,18 +106,19 @@ createMappingOverviewInsertQuery <- function(connectionDetails, resultsDatabaseS
   }
   
   # TODO: replace by regular loadRenderTranslateSql
-  sql <- loadRenderTranslateSql2("vocabulary_mapping/ListMappings.sql",
-                                 packageName = "Achilles",
-                                 dbms = connectionDetails$dbms,
-                                 results_database_schema = resultsDatabaseSchema,
-                                 cdm_database_schema = connectionDetails$schema,
-                                 cdm_table = cdmTable,
-                                 concept_id_column = conceptIdColumn,
-                                 source_concept_id_column = sourceIdColumn,
-                                 source_value_column = sourceValueColumn,
-                                 source_vocabulary_id_list = sourceVocabularyIds,
-                                 mapping_name = mappingName,
-                                 person_id_column = personColumn
+  sql <- SqlRender::loadRenderTranslateSql(
+    sqlFilename ="vocabulary_mapping/ListMappings.sql",
+    packageName = "Achilles",
+    dbms = connectionDetails$dbms,
+    results_database_schema = resultsDatabaseSchema,
+    cdm_database_schema = connectionDetails$schema,
+    cdm_table = cdmTable,
+    concept_id_column = conceptIdColumn,
+    source_concept_id_column = sourceIdColumn,
+    source_value_column = sourceValueColumn,
+    source_vocabulary_id_list = sourceVocabularyIds,
+    mapping_name = mappingName,
+    person_id_column = personColumn
   )
   
   return(sql)
@@ -151,11 +152,12 @@ mappingStats <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
     mappingName = "%" 
   }
   
-  sql <- loadRenderTranslateSql2("vocabulary_mapping/MappingStats.sql",
-                                 packageName = "Achilles",
-                                 dbms = connectionDetails$dbms,
-                                 results_database_schema = resultsDatabaseSchema,
-                                 mapping_name = mappingName
+  sql <- SqlRender::loadRenderTranslateSql(
+    sqlFilename ="vocabulary_mapping/MappingStats.sql",
+    packageName = "Achilles",
+    dbms = connectionDetails$dbms,
+    results_database_schema = resultsDatabaseSchema,
+    mapping_name = mappingName
   )
 
   df <- querySql(connection, sql)
@@ -186,10 +188,11 @@ mappingStatsOverview <- function(connectionDetails, resultsDatabaseSchema = "web
     listAllMappings(connectionDetails, resultsDatabaseSchema)
   }
 
-  sql <- loadRenderTranslateSql2("vocabulary_mapping/MappingStatsOverview.sql",
-                                 packageName = "Achilles",
-                                 dbms = connectionDetails$dbms,
-                                 results_database_schema = resultsDatabaseSchema
+  sql <- SqlRender::loadRenderTranslateSql(     
+    sqlFilename ="vocabulary_mapping/MappingStatsOverview.sql",
+    packageName = "Achilles",
+    dbms = connectionDetails$dbms,
+    results_database_schema = resultsDatabaseSchema
   )
 
   df <- querySql(connection, sql)
@@ -223,8 +226,8 @@ topMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappi
     topX = "NULL"
   }
   
-  sql <- loadRenderTranslateSql2(
-    "vocabulary_mapping/TopMappedConcepts.sql",
+  sql <- SqlRender::loadRenderTranslateSql(
+    sqlFilename ="vocabulary_mapping/TopMappedConcepts.sql",
     packageName = "Achilles",
     dbms = connectionDetails$dbms,
     results_database_schema = resultsDatabaseSchema,
@@ -268,8 +271,8 @@ topNotMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
     topX = "NULL"
   }
   
-  sql <- loadRenderTranslateSql2(
-    "vocabulary_mapping/TopNotMappedConcepts.sql",
+  sql <- SqlRender::loadRenderTranslateSql(
+    sqlFilename = "vocabulary_mapping/TopNotMappedConcepts.sql",
     packageName = "Achilles",
     dbms = connectionDetails$dbms,
     results_database_schema = resultsDatabaseSchema,
@@ -325,24 +328,6 @@ hasMappingOverview <- function(connection, resultsDatabaseSchema = "webapi", dbm
     result <- querySql(connection, query$sql)$COUNT
     
     return(result > 0)
-}
-
-loadRenderTranslateSql2 <- function (sqlFilename, packageName, dbms = "sql server", ..., 
-                                     oracleTempSchema = NULL) 
-{
-  pathToSql <- system.file(paste("sql/", gsub(" ", "_", dbms), 
-                                 sep = ""), sqlFilename, package = packageName)
-  mustTranslate <- !file.exists(pathToSql)
-  if (mustTranslate) {
-    pathToSql <- system.file(paste("sql/", "sql_server", 
-                                   sep = ""), sqlFilename, package = packageName)
-  }
-  parameterizedSql <- readChar(pathToSql, file.info(pathToSql)$size)
-  renderedSql <- renderSql(parameterizedSql[1], ...)$sql
-  if (mustTranslate) 
-    renderedSql <- translateSql(sql = renderedSql, targetDialect = dbms, 
-                                oracleTempSchema = oracleTempSchema)$sql
-  renderedSql
 }
 
 #' @title Full export of all vocabulary stats
