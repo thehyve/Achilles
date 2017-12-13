@@ -124,7 +124,6 @@ createMappingOverviewInsertQuery <- function(connectionDetails, resultsDatabaseS
     personColumn <- "CAST(NULL AS INTEGER)"
   }
   
-  # TODO: replace by regular loadRenderTranslateSql
   sql <- SqlRender::loadRenderTranslateSql(
     sqlFilename ="vocabulary_mapping/ListMappings.sql",
     packageName = "Achilles",
@@ -245,31 +244,7 @@ mappingStatsOverview <- function(connectionDetails, resultsDatabaseSchema = "web
 #' 
 #' @export
 topMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappingName, topX = 20){
-  connection <- connect(connectionDetails)
-  # If no mapping overview created yet, do that here
-  if (!hasMappingOverview(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)) {
-    listAllMappings(connectionDetails, resultsDatabaseSchema)
-  }
-  
-  if (is.null(topX)) {
-    topX = "NULL"
-  }
-  
-  sql <- SqlRender::loadRenderTranslateSql(
-    sqlFilename ="vocabulary_mapping/TopMappedConcepts.sql",
-    packageName = "Achilles",
-    dbms = connectionDetails$dbms,
-    results_database_schema = resultsDatabaseSchema,
-    mapping_name = mappingName,
-    limit = topX
-  )
-
-  df <- querySql(connection, sql)
-  
-  # Coverage as percentage of all records in this mapping type
-  total <- getTotalFrequency(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)
-  df$PERCENTAGE_OF_ROWS <- df$N_ROWS / total * 100
-  
+  df <- topMapped_("vocabulary_mapping/TopMappedConcepts.sql", connectionDetails, resultsDatabaseSchema, mappingName, topX)
   return(df)
 }
 
@@ -290,6 +265,14 @@ topMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappi
 #' 
 #' @export
 topNotMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", mappingName, topX = 20){
+  df <- topMapped_("vocabulary_mapping/TopNotMappedConcepts.sql", connectionDetails, resultsDatabaseSchema, mappingName, topX)
+  df$TO_GAIN <- cumsum(df$PERCENTAGE_OF_ROWS)
+    
+  return(df)
+}
+
+#' Convenience function used by both topMapped and topNotMapped
+topMapped_ <- function(sqlFilename, connectionDetails, resultsDatabaseSchema, mappingName, topX){
   connection <- connect(connectionDetails)
   # If no mapping overview created yet, do that here
   if (!hasMappingOverview(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)) {
@@ -301,22 +284,20 @@ topNotMapped <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
   }
   
   sql <- SqlRender::loadRenderTranslateSql(
-    sqlFilename = "vocabulary_mapping/TopNotMappedConcepts.sql",
+    sqlFilename = sqlFilename,
     packageName = "Achilles",
     dbms = connectionDetails$dbms,
     results_database_schema = resultsDatabaseSchema,
     mapping_name = mappingName,
     limit = topX
   )
-
+  
   df <- querySql(connection, sql)
   
   # Coverage as percentage of all records in this mapping type
   total <- getTotalFrequency(connection, resultsDatabaseSchema, connectionDetails$dbms, mappingName)
   df$PERCENTAGE_OF_ROWS <- df$N_ROWS / total * 100
-  # To Gain percentage if topX mapped
-  df$TO_GAIN <- cumsum(df$PERCENTAGE_OF_ROWS)
-    
+  
   return(df)
 }
 
