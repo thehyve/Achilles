@@ -1,3 +1,22 @@
+# @file Achilles
+#
+# This file is part of Achilles
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author The Hyve
+# @author Maxim Moinat
+
 #' @title Create table of all source to target concept mappings
 #'
 #' @description
@@ -161,7 +180,7 @@ mappingStats <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
   )
 
   df <- querySql(connection, sql)
-  
+
   df$PERCENTAGE_OF_ROWS <- df$N_ROWS / sum(df$N_ROWS) * 100
   return(df)
 }
@@ -176,11 +195,11 @@ mappingStats <- function(connectionDetails, resultsDatabaseSchema = "webapi", ma
 #' 
 #' @param connectionDetails An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
 #' @param resultsDatabaseSchema		string name of database schema that we can write results to. Default is 'webapi'
+#' @param withTotalRow   boolean
 #' 
-#' @return A dataframe with results
-#'
+#' @return A dataframe with overview of mapping statistics
 #' @export
-mappingStatsOverview <- function(connectionDetails, resultsDatabaseSchema = "webapi") {
+mappingStatsOverview <- function(connectionDetails, resultsDatabaseSchema = "webapi", withTotalRow = FALSE) {
   connection <- connect(connectionDetails)
   
   # If no mapping overview created yet, do that here
@@ -196,6 +215,16 @@ mappingStatsOverview <- function(connectionDetails, resultsDatabaseSchema = "web
   )
 
   df <- querySql(connection, sql)
+  
+  # Set first column as rownames
+  rownames(df) <- df$MAPPING_NAME
+  df$MAPPING_NAME <- NULL
+
+  if (withTotalRow) {
+    totalRow <- colSums(df[,1:(ncol(df)-1)])
+    totalRow <- c(totalRow, 1 - totalRow[["N_ROWS_NOT_MAPPED"]]/totalRow[["N_ROWS"]])
+    df["TOTAL" ,] <- totalRow
+  }
   return(df)
 }
 
@@ -350,7 +379,7 @@ hasMappingOverview <- function(connection, resultsDatabaseSchema = "webapi", dbm
 exportVocabStats <- function(connectionDetails, resultsDatabaseSchema = "webapi",  outputPath="./out", topX = 20) {
   mappingNames <- getMappingFields()$mapping_id
   
-  df.overview <- mappingStatsOverview(connectionDetails, resultsDatabaseSchema)
+  df.overview <- mappingStatsOverview(connectionDetails, resultsDatabaseSchema, TRUE)
   dir.create(outputPath, showWarnings = FALSE)
   write.csv(df.overview, file.path(outputPath, "mapping_overview.csv"))
   
