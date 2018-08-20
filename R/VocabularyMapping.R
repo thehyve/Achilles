@@ -368,12 +368,12 @@ exportVocabStats <- function(connectionDetails, resultsDatabaseSchema = "webapi"
     
     df.mapped <- topMapped(connectionDetails, resultsDatabaseSchema, mappingName, topX)
     if (nrow(df.mapped) > 0) {
-      write.csv(df.mapped, file.path(subPath, "top20mapped.csv"))
+      write.csv(df.mapped, file.path(subPath, "topMapped.csv"))
     }
     
-    df.notmapped <- topNotMapped(connectionDetails, resultsDatabaseSchema, mappingName, 20)
+    df.notmapped <- topNotMapped(connectionDetails, resultsDatabaseSchema, mappingName, topX)
     if (nrow(df.notmapped) > 0) {
-      write.csv(df.notmapped, file.path(subPath, "top20unmapped.csv"))
+      write.csv(df.notmapped, file.path(subPath, "topUnmapped.csv"))
     }
   }
 }
