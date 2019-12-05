@@ -1,29 +1,56 @@
 # A Docker container to run the OHDSI/Achilles analysis tool
-FROM ubuntu:trusty
+FROM r-base:3.6.1
 
-MAINTAINER Aaron Browne <brownea@email.chop.edu>
+MAINTAINER Joris Borgdorff <joris@thehyve.nl>
 
 # Install java, R and required packages and clean up.
-RUN echo deb http://ppa.launchpad.net/marutter/rrutter/ubuntu trusty main >> /etc/apt/sources.list && \
-    echo deb http://ppa.launchpad.net/marutter/c2d4u/ubuntu trusty main >> /etc/apt/sources.list && \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys C9A7585B49D51698710F3A115E25F516B04C661B && \
-    sed 's#http://.*archive\.ubuntu\.com/ubuntu/#mirror://mirrors.ubuntu.com/mirrors.txt#g' -i /etc/apt/sources.list && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
-      r-base \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      r-cran-devtools \
+      r-cran-xml \
+      r-cran-rjava \
+      r-cran-rjson \
+      r-cran-bit \
+      r-cran-dbi \
+      r-cran-pkgconfig \
+      r-cran-bh \
+      r-cran-plogr \
+      r-cran-tibble \
+      r-cran-snow \
+      r-cran-fastmatch \
+      r-cran-triebeard \
+      r-cran-fansi \
+      r-cran-utf8 \
+      r-cran-zeallot \
+      r-cran-urltools \
+      r-cran-ellipsis \
+      r-cran-purrr \
+      r-cran-tidyselect \
+      r-cran-vctrs \
+      r-cran-vctrs \
+      r-cran-dplyr \
       r-cran-devtools \
       r-cran-httr \
       r-cran-rjson \
       r-cran-stringr \
       r-cran-rjava \
       r-cran-dbi \
-      r-cran-ffbase \
       r-cran-urltools \
-      libxml2-dev \
-      littler \
-      openjdk-7-jdk \
+      default-jdk-headless \
     && rm -rf /var/lib/apt/lists/* \
     && R CMD javareconf
+
+RUN install.r  \
+     rlang \
+     BH \
+     pillar \
+     tibble \
+  && installGithub.r \
+      OHDSI/SqlRender \
+      OHDSI/DatabaseConnectorJars \
+      OHDSI/DatabaseConnector \
+      OHDSI/ParallelLogger \
+    && rm -rf /tmp/downloaded_packages/ /tmp/*.rds
 
 # Set default locale
 RUN echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
@@ -32,35 +59,6 @@ RUN echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
 
 ENV LC_ALL en_US.UTF-8
 ENV LANG en_US.UTF-8
-
-# Install OHDSI/ParallelLogger 
-RUN R -e "install.packages( \
- c( \
-  'XML', \
-  'RJSONIO' \
- ), \ 
- repos='http://cran.rstudio.com/', \
-) "
-
-# Install Achilles requirements that need to be installed from source
-RUN echo 'options(repos=structure(c(CRAN="http://cran.cnr.berkeley.edu/")))' > /root/.Rprofile && \
-    /usr/share/doc/littler/examples/install.r remotes && \
-    /usr/share/doc/littler/examples/install.r docopt && \
-    /usr/share/doc/littler/examples/install.r openxlsx && \
-    /usr/share/doc/littler/examples/install.r httr && \
-    /usr/share/doc/littler/examples/install.r rjson && \
-    /usr/share/doc/littler/examples/install.r R.oo && \
-    /usr/share/doc/littler/examples/install.r formatR && \
-    /usr/share/doc/littler/examples/install.r R.utils && \
-    /usr/share/doc/littler/examples/install.r snow && \
-    /usr/share/doc/littler/examples/install.r mailR && \
-    /usr/share/doc/littler/examples/install.r dplyr && \
-    /usr/share/doc/littler/examples/installGithub.r \
-      OHDSI/SqlRender \
-      OHDSI/DatabaseConnectorJars \
-      OHDSI/DatabaseConnector \
-      OHDSI/ParallelLogger \
-    && rm -rf /tmp/downloaded_packages/ /tmp/*.rds
 
 # Configure workspace
 WORKDIR /opt/app
@@ -71,7 +69,7 @@ VOLUME /opt/app/output
 COPY . /opt/app/
 
 # Install Achilles from source
-RUN R CMD INSTALL /opt/app \
+RUN install.r . \
     && rm -rf /tmp/downloaded_packages/ /tmp/*.rds \
     && find /opt/app -mindepth 1 -not \( -wholename /opt/app/docker-run -or -wholename /opt/app/output \) -delete
 
