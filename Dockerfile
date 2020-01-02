@@ -6,9 +6,6 @@ MAINTAINER Joris Borgdorff <joris@thehyve.nl>
 RUN install.r \
       dplyr \
     && installGithub.r \
-      OHDSI/SqlRender \
-      OHDSI/DatabaseConnectorJars \
-      OHDSI/DatabaseConnector \
       OHDSI/ParallelLogger \
     && rm -rf /tmp/downloaded_packages/ /tmp/*.rds
 
@@ -26,4 +23,4 @@ RUN install.r . \
     && find /opt/app -mindepth 1 -not \( -wholename /opt/app/docker-run -or -wholename /opt/app/output \) -delete
 
 # Define run script as default command
-CMD ["docker-run"]
+CMD ["/opt/app/docker-run"]
