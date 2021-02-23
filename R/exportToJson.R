@@ -146,7 +146,8 @@ exportToJson <- function (connectionDetails,
   
   if (("META" %in% reports))
   {
-    generateDomainMetaReport(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema)
+    generateMetadataReport(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema)
+    generateCdmSourceReport(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema)
   }
   
   if ( ("MEASUREMENT" %in% reports))
@@ -178,6 +179,10 @@ exportToJson <- function (connectionDetails,
   {  
     generateVisitTreemap(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema)
     generateVisitReports(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema)
+  }
+  
+  if ("PERFORMANCE" %in% reports) {
+    generateAchillesPerformanceReport(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema)
   }
   
   # dashboard is always last
@@ -601,6 +606,33 @@ exportVisitToJson <- function (connectionDetails, cdmDatabaseSchema, resultsData
   exportToJson(connectionDetails, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, reports = c("VISIT"), vocabDatabaseSchema)  
 }
 
+
+#' @title exportPerformanceToJson
+#'
+#' @description
+#' \code{exportPerformanceToJson} Exports Achilles performance report into a JSON form for reports.
+#'
+#' @details
+#' Creates performance report including how long each Achilles result took to generate.
+#' 
+#' 
+#' @param connectionDetails  An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
+#' @param cdmDatabaseSchema      Name of the database schema that contains the vocabulary files
+#' @param resultsDatabaseSchema  		Name of the database schema that contains the Achilles analysis files. Default is cdmDatabaseSchema
+#' @param outputPath		A folder location to save the JSON files. Default is current working folder
+#' @param vocabDatabaseSchema		string name of database schema that contains OMOP Vocabulary. Default is cdmDatabaseSchema. On SQL Server, this should specifiy both the database and the schema, so for example 'results.dbo'.
+#' 
+#' @return none 
+#' @examples \dontrun{
+#'   connectionDetails <- DatabaseConnector::createConnectionDetails(dbms="sql server", server="yourserver")
+#'   exportPerformanceToJson(connectionDetails, cdmDatabaseSchema="cdm4_sim", outputPath="your/output/path")
+#' }
+#' @export
+exportPerformanceToJson <- function (connectionDetails, cdmDatabaseSchema, resultsDatabaseSchema, outputPath = getwd(), vocabDatabaseSchema = cdmDatabaseSchema)
+{
+  exportToJson(connectionDetails, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, reports = c("PERFORMANCE"), vocabDatabaseSchema)  
+}
+
 generateAchillesHeelReport <- function(conn, dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema = cdmDatabaseSchema) {
   writeLines("Generating achilles heel report")
   output <- {}
@@ -619,26 +651,67 @@ generateAchillesHeelReport <- function(conn, dbms, cdmDatabaseSchema, resultsDat
   write(jsonOutput, file=paste(outputPath, "/achillesheel.json", sep=""))  
 }
 
-generateDomainMetaReport <- function(conn, dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema = cdmDatabaseSchema) {
-  writeLines("Generating domain meta report")
+generateAchillesPerformanceReport <- function(conn, dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema = cdmDatabaseSchema) {
+  writeLines("Generating achilles performance report")
   output <- {}
   
-  queryDomainMeta <- SqlRender::loadRenderTranslateSql(sqlFilename = "export/domainmeta/sqlDomainMeta.sql",
+  queryAchillesPerformance <- SqlRender::loadRenderTranslateSql(sqlFilename = "export/performance/sqlAchillesPerformance.sql",
+                                                         packageName = "Achilles",
+                                                         dbms = dbms,
+                                                         warnOnMissingParameters = FALSE,
+                                                         cdm_database_schema = cdmDatabaseSchema,
+                                                         results_database_schema = resultsDatabaseSchema,
+                                                         vocab_database_schema = vocabDatabaseSchema
+  )  
+  
+  output$MESSAGES <- DatabaseConnector::querySql(conn,queryAchillesPerformance)
+  jsonOutput = rjson::toJSON(output)
+  write(jsonOutput, file=paste(outputPath, "/achillesperformance.json", sep=""))  
+}
+
+generateMetadataReport <- function(conn, dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema = cdmDatabaseSchema) {
+  writeLines("Generating metadata report")
+  output <- {}
+  
+  queryMetadata <- SqlRender::loadRenderTranslateSql(sqlFilename = "export/metadata/sqlMetadata.sql",
                                             packageName = "Achilles",
                                             dbms = dbms,
                                             warnOnMissingParameters = FALSE,
                                             cdm_database_schema = cdmDatabaseSchema
   )  
   
-  if ("CDM_DOMAIN_META" %in% DatabaseConnector::getTableNames(connection = conn, databaseSchema = cdmDatabaseSchema))
+  if ("METADATA" %in% DatabaseConnector::getTableNames(connection = conn, databaseSchema = cdmDatabaseSchema))
   {
-    output$MESSAGES <- DatabaseConnector::querySql(conn, queryDomainMeta) 
+    output$MESSAGES <- DatabaseConnector::querySql(conn, queryMetadata) 
     jsonOutput = rjson::toJSON(output)
-    write(jsonOutput, file=paste(outputPath, "/domainmeta.json", sep=""))  
+    write(jsonOutput, file=paste(outputPath, "/metadata.json", sep=""))  
   }
   else
   {
-    writeLines("No CDM_DOMAIN_META table found, skipping export")  
+    writeLines("No METADATA table found, skipping export")  
+  }
+}
+
+generateCdmSourceReport <- function(conn, dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, vocabDatabaseSchema = cdmDatabaseSchema) {
+  writeLines("Generating cdm source report")
+  output <- {}
+  
+  queryCdmSource <- SqlRender::loadRenderTranslateSql(sqlFilename = "export/metadata/sqlCdmSource.sql",
+                                                     packageName = "Achilles",
+                                                     dbms = dbms,
+                                                     warnOnMissingParameters = FALSE,
+                                                     cdm_database_schema = cdmDatabaseSchema
+  )  
+  
+  if ("CDM_SOURCE" %in% DatabaseConnector::getTableNames(connection = conn, databaseSchema = cdmDatabaseSchema))
+  {
+    output$MESSAGES <- DatabaseConnector::querySql(conn, queryCdmSource) 
+    jsonOutput = rjson::toJSON(output)
+    write(jsonOutput, file=paste(outputPath, "/cdm_source.json", sep=""))  
+  }
+  else
+  {
+    writeLines("No CDM_SOURCE table found, skipping export")  
   }
 }
 
@@ -805,7 +878,7 @@ generateConditionReports <- function(conn, dbms, cdmDatabaseSchema, resultsDatab
     report <- {}
     report$PREVALENCE_BY_GENDER_AGE_YEAR <- dataPrevalenceByGenderAgeYear[dataPrevalenceByGenderAgeYear$CONCEPT_ID == concept_id,c(3,4,5,6)]    
     report$PREVALENCE_BY_MONTH <- dataPrevalenceByMonth[dataPrevalenceByMonth$CONCEPT_ID == concept_id,c(3,4)]
-    report$CONDITIONS_BY_TYPE <- dataConditionsByType[dataConditionsByType$CONDITION_CONCEPT_ID == concept_id,c(4,5)]
+    report$CONDITIONS_BY_TYPE <- dataConditionsByType[dataConditionsByType$CONDITION_CONCEPT_ID == concept_id,c(2,3)]
     report$AGE_AT_FIRST_DIAGNOSIS <- dataAgeAtFirstDiagnosis[dataAgeAtFirstDiagnosis$CONCEPT_ID == concept_id,c(2,3,4,5,6,7,8,9)]
     filename <- paste(outputPath, "/conditions/condition_" , concept_id , ".json", sep='')  
     

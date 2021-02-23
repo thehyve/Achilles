@@ -4,16 +4,30 @@
 \alias{achilles}
 \title{The main Achilles analyses (for v5.x)}
 \usage{
-achilles(connectionDetails, cdmDatabaseSchema,
+achilles(
+  connectionDetails,
+  cdmDatabaseSchema,
   resultsDatabaseSchema = cdmDatabaseSchema,
   scratchDatabaseSchema = resultsDatabaseSchema,
   vocabDatabaseSchema = cdmDatabaseSchema,
-  oracleTempSchema = resultsDatabaseSchema, sourceName = "",
-  analysisIds, createTable = TRUE, smallCellCount = 5,
-  cdmVersion = "5", runHeel = TRUE, validateSchema = FALSE,
-  runCostAnalysis = FALSE, createIndices = TRUE, numThreads = 1,
-  tempAchillesPrefix = "tmpach", dropScratchTables = TRUE,
-  sqlOnly = FALSE, outputFolder = "output", verboseMode = TRUE)
+  oracleTempSchema = resultsDatabaseSchema,
+  sourceName = "",
+  analysisIds,
+  createTable = TRUE,
+  smallCellCount = 5,
+  cdmVersion = "5",
+  runHeel = FALSE,
+  runCostAnalysis = FALSE,
+  createIndices = TRUE,
+  numThreads = 1,
+  tempAchillesPrefix = "tmpach",
+  dropScratchTables = TRUE,
+  sqlOnly = FALSE,
+  outputFolder = "output",
+  verboseMode = TRUE,
+  optimizeAtlasCache = FALSE,
+  defaultAnalysesOnly = TRUE
+)
 }
 \arguments{
 \item{connectionDetails}{An R object of type \code{connectionDetails} created using the function \code{createConnectionDetails} in the \code{DatabaseConnector} package.}
@@ -39,13 +53,11 @@ If not specified, all analyses will be executed. Use \code{\link{getAnalysisDeta
 
 \item{createTable}{If true, new results tables will be created in the results schema. If not, the tables are assumed to already exist, and analysis results will be inserted (slower on MPP).}
 
-\item{smallCellCount}{To avoid patient identifiability, cells with small counts (<= smallCellCount) are deleted. Set to NULL if you don't want any deletions.}
+\item{smallCellCount}{To avoid patient identification, cells with small counts (<= smallCellCount) are deleted. Set to 0 for complete summary without small cell count restrictions.}
 
 \item{cdmVersion}{Define the OMOP CDM version used:  currently supports v5 and above. Use major release number or minor number only (e.g. 5, 5.3)}
 
 \item{runHeel}{Boolean to determine if Achilles Heel data quality reporting will be produced based on the summary statistics.  Default = TRUE}
-
-\item{validateSchema}{Boolean to determine if CDM Schema Validation should be run. Default = FALSE}
 
 \item{runCostAnalysis}{Boolean to determine if cost analysis should be run. Note: only works on v5.1+ style cost tables.}
 
@@ -62,6 +74,10 @@ If not specified, all analyses will be executed. Use \code{\link{getAnalysisDeta
 \item{outputFolder}{Path to store logs and SQL files}
 
 \item{verboseMode}{Boolean to determine if the console will show all execution steps. Default = TRUE}
+
+\item{optimizeAtlasCache}{Boolean to determine if the atlas cache has to be optimized. Default = FALSE}
+
+\item{defaultAnalysesOnly}{Boolean to determine if only default analyses should be run. Including non-default analyses is substantially more resource intensive.  Default = TRUE}
 }
 \value{
 An object of type \code{achillesResults} containing details for connecting to the database containing the results

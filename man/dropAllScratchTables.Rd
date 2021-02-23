@@ -4,10 +4,17 @@
 \alias{dropAllScratchTables}
 \title{Drop all possible scratch tables}
 \usage{
-dropAllScratchTables(connectionDetails, scratchDatabaseSchema,
-  tempAchillesPrefix = "tmpach", tempHeelPrefix = "tmpheel",
-  numThreads = 1, tableTypes = c("achilles", "heel"), outputFolder,
-  verboseMode = TRUE)
+dropAllScratchTables(
+  connectionDetails,
+  scratchDatabaseSchema,
+  tempAchillesPrefix = "tmpach",
+  tempHeelPrefix = "tmpheel",
+  numThreads = 1,
+  tableTypes = c("achilles", "heel"),
+  outputFolder,
+  verboseMode = TRUE,
+  defaultAnalysesOnly = TRUE
+)
 }
 \arguments{
 \item{connectionDetails}{An R object of type \code{connectionDetails} created using the function \code{createConnectionDetails} in the \code{DatabaseConnector} package.}
@@ -25,6 +32,8 @@ dropAllScratchTables(connectionDetails, scratchDatabaseSchema,
 \item{outputFolder}{Path to store logs and SQL files}
 
 \item{verboseMode}{Boolean to determine if the console will show all execution steps. Default = TRUE}
+
+\item{defaultAnalysesOnly}{Boolean to determine if only default analyses should be run. Including non-default analyses is substantially more resource intensive.  Default = TRUE}
 }
 \description{
 Drop all possible scratch tables
