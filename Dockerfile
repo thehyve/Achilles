@@ -5,6 +5,7 @@ MAINTAINER Joris Borgdorff <joris@thehyve.nl>
 
 RUN install.r \
       dplyr \
+      readr \
     && installGithub.r \
       OHDSI/ParallelLogger \
     && rm -rf /tmp/downloaded_packages/ /tmp/*.rds
